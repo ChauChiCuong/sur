@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101812">
+  <title>Survev Sandbox - Demo tĩnh</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      background: #101812;
+      color: #f4f4e8;
+      font-synthesis: none;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background:
+        radial-gradient(ellipse at 50% 0, #263d2b 0, transparent 55%),
+        #101812;
+    }
+
+    button { font: inherit; }
+
+    .page {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.2rem, 3vw, 1.8rem);
+      letter-spacing: .02em;
+    }
+
+    .badge {
+      padding: 6px 10px;
+      border: 1px solid #72834d;
+      border-radius: 999px;
+      color: #d7ed9c;
+      font-size: .78rem;
+      white-space: nowrap;
+    }
+
+    .notice {
+      margin: 0 0 14px;
+      color: #c1cbb8;
+      font-size: .9rem;
+      line-height: 1.5;
+    }
+
+    .game {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #61704b;
+      border-radius: 12px;
+      background: #75824c;
+      box-shadow: 0 18px 50px #0007;
+      touch-action: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: min(68vh, 620px);
+      min-height: 360px;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .hud {
+      position: absolute;
+      inset: 12px 12px auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+      text-shadow: 0 1px 3px #000;
+    }
+
+    .hud-box {
+      padding: 8px 11px;
+      border: 1px solid #ffffff38;
+      border-radius: 8px;
+      background: #111a13c9;
+      font-size: .88rem;
+    }
+
+    .health-track {
+      width: 150px;
+      height: 8px;
+      margin-top: 6px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: #402e29;
+    }
+
+    .health-fill {
+      width: 100%;
+      height: 100%;
+      background: #75d66c;
+      transition: width .12s linear;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: #09100a9c;
+      text-align: center;
+    }
+
+    .overlay[hidden] { display: none; }
+
+    .dialog {
+      max-width: 440px;
+      padding: 24px;
+      border: 1px solid #89976a;
+      border-radius: 12px;
+      background: #172219f2;
+      box-shadow: 0 12px 35px #0008;
+    }
+
+    .dialog h2 { margin: 0 0 8px; }
+    .dialog p { margin: 0 0 16px; color: #c1cbb8; line-height: 1.5; }
+
+    .primary {
+      min-height: 42px;
+      padding: 9px 18px;
+      border: 0;
+      border-radius: 8px;
+      background: #c3e66b;
+      color: #182013;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    .primary:hover { background: #d4f27d; }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      padding: 12px 2px 0;
+      color: #c1cbb8;
+      font-size: .85rem;
+    }
+
+    .controls strong { color: #f4f4e8; }
+
+    .touch-controls { display: none; }
+
+    @media (pointer: coarse) {
+      .touch-controls {
+        position: absolute;
+        inset: auto 16px 16px;
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        pointer-events: none;
+      }
+
+      .stick, .fire {
+        display: grid;
+        place-items: center;
+        width: 76px;
+        height: 76px;
+        border: 1px solid #ffffff80;
+        border-radius: 50%;
+        background: #182018a8;
+        color: #fff;
+        font-weight: 700;
+        pointer-events: auto;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .fire { width: 68px; height: 68px; background: #8d392dbd; }
+      canvas { cursor: default; }
+    }
+
+    @media (max-width: 600px) {
+      .page { padding: 12px; }
+      .badge { font-size: .68rem; }
+      canvas { height: 66vh; min-height: 340px; }
+      .hud-box { padding: 7px 8px; font-size: .78rem; }
+      .health-track { width: 110px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>Survev Sandbox</h1>
+      <span class="badge">DEMO TĨNH · CHƠI OFFLINE</span>
+    </header>
+    <p class="notice">
+      Đấu trường thử nghiệm chạy hoàn toàn trong trình duyệt. Đây không phải máy chủ hay bản sao đầy đủ của Survev.io.
+    </p>
+
+    <section class="game" aria-label="Đấu trường sandbox">
+      <canvas id="arena" aria-label="Khu vực chơi"></canvas>
+      <div class="hud" aria-live="polite">
+        <div class="hud-box">
+          <div>Máu <span id="healthText">100</span></div>
+          <div class="health-track"><div id="healthFill" class="health-fill"></div></div>
+        </div>
+        <div class="hud-box">Mục tiêu: <span id="score">0</span> · Còn lại: <span id="remaining">0</span></div>
+      </div>
+
+      <div class="touch-controls" aria-label="Điều khiển cảm ứng">
+        <div class="stick" id="stick" role="button" aria-label="Di chuyển">DI CHUYỂN</div>
+        <div class="fire" id="fire" role="button" aria-label="Bắn">BẮN</div>
+      </div>
+
+      <div class="overlay" id="overlay">
+        <div class="dialog">
+          <h2 id="overlayTitle">Sẵn sàng vào đấu trường?</h2>
+          <p id="overlayText">Di chuyển, ngắm và bắn các bot. Vòng an toàn sẽ thu hẹp dần — đừng đứng ngoài vùng sáng.</p>
+          <button class="primary" id="startButton" type="button">Bắt đầu</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="controls">
+      <span><strong>WASD / phím mũi tên</strong>: di chuyển</span>
+      <span><strong>Chuột</strong>: ngắm</span>
+      <span><strong>Giữ chuột trái</strong>: bắn</span>
+      <span><strong>R</strong>: chơi lại</span>
+      <span><strong>Điện thoại</strong>: chạm để ngắm, dùng nút di chuyển và bắn</span>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const canvas = document.getElementById("arena");
+      const ctx = canvas.getContext("2d");
+      const overlay = document.getElementById("overlay");
+      const overlayTitle = document.getElementById("overlayTitle");
+      const overlayText = document.getElementById("overlayText");
+      const startButton = document.getElementById("startButton");
+      const healthText = document.getElementById("healthText");
+      const healthFill = document.getElementById("healthFill");
+      const scoreText = document.getElementById("score");
+      const remainingText = document.getElementById("remaining");
+      const keys = new Set();
+      const world = { width: 1600, height: 1100 };
+      const player = { x: 800, y: 550, radius: 15, health: 100, angle: 0, cooldown: 0 };
+      const zone = { x: 800, y: 550, radius: 520, minRadius: 115, elapsed: 0 };
+      const bots = [];
+      const bullets = [];
+      const obstacles = [];
+      let running = false;
+      let score = 0;
+      let lastTime = 0;
+      let fireHeld = false;
+      let movePointer = null;
+      let movement = { x: 0, y: 0 };
+      let view = { width: 1, height: 1, scale: 1, x: 0, y: 0 };
+      let randomSeed = 74921;
+
+      function random() {
+        randomSeed = (randomSeed * 16807) % 2147483647;
+        return (randomSeed - 1) / 2147483646;
+      }
+
+      function resize() {
+        const rect = canvas.getBoundingClientRect();
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.max(1, Math.round(rect.width * ratio));
+        canvas.height = Math.max(1, Math.round(rect.height * ratio));
+        view.width = rect.width;
+        view.height = rect.height;
+        view.scale = Math.min(rect.width / world.width, rect.height / world.height);
+        view.x = (rect.width - world.width * view.scale) / 2;
+        view.y = (rect.height - world.height * view.scale) / 2;
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        draw();
+      }
+
+      function reset() {
+        randomSeed = 74921;
+        score = 0;
+        player.x = world.width / 2;
+        player.y = world.height / 2;
+        player.health = 100;
+        player.cooldown = 0;
+        zone.elapsed = 0;
+        zone.radius = 520;
+        bullets.length = 0;
+        bots.length = 0;
+        obstacles.length = 0;
+        for (let i = 0; i < 28; i++) {
+          obstacles.push({
+            x: 85 + random() * (world.width - 170),
+            y: 85 + random() * (world.height - 170),
+            radius: 16 + random() * 22,
+            type: random() > .5 ? "tree" : "rock"
+          });
+        }
+        for (let i = 0; i < 9; i++) {
+          const angle = random() * Math.PI * 2;
+          const distance = 250 + random() * 360;
+          bots.push({
+            x: player.x + Math.cos(angle) * distance,
+            y: player.y + Math.sin(angle) * distance,
+            radius: 13,
+            health: 3,
+            fire: .7 + random() * 1.4,
+            wander: random() * Math.PI * 2
+          });
+        }
+        updateHud();
+      }
+
+      function updateHud() {
+        healthText.textContent = Math.max(0, Math.ceil(player.health));
+        healthFill.style.width = `${Math.max(0, player.health)}%`;
+        scoreText.textContent = score;
+        remainingText.textContent = bots.length;
+      }
+
+      function screenToWorld(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: (clientX - rect.left - view.x) / view.scale,
+          y: (clientY - rect.top - view.y) / view.scale
+        };
+      }
+
+      function aimAt(clientX, clientY) {
+        const point = screenToWorld(clientX, clientY);
+        player.angle = Math.atan2(point.y - player.y, point.x - player.x);
+      }
+
+      function shoot(x, y, angle, speed, owner) {
+        bullets.push({
+          x: x + Math.cos(angle) * 22,
+          y: y + Math.sin(angle) * 22,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1.4,
+          owner
+        });
+      }
+
+      function update(dt) {
+        if (!running) return;
+        zone.elapsed += dt;
+        zone.radius = Math.max(zone.minRadius, 520 - zone.elapsed * 3);
+        player.cooldown -= dt;
+
+        let dx = movement.x;
+        let dy = movement.y;
+        if (keys.has("w") || keys.has("arrowup")) dy -= 1;
+        if (keys.has("s") || keys.has("arrowdown")) dy += 1;
+        if (keys.has("a") || keys.has("arrowleft")) dx -= 1;
+        if (keys.has("d") || keys.has("arrowright")) dx += 1;
+        const length = Math.hypot(dx, dy) || 1;
+        player.x += dx / length * 220 * dt;
+        player.y += dy / length * 220 * dt;
+        player.x = Math.max(player.radius, Math.min(world.width - player.radius, player.x));
+        player.y = Math.max(player.radius, Math.min(world.height - player.radius, player.y));
+
+        if (fireHeld && player.cooldown <= 0) {
+          shoot(player.x, player.y, player.angle, 690, "player");
+          player.cooldown = .19;
+        }
+
+        for (const bot of bots) {
+          const toPlayer = Math.atan2(player.y - bot.y, player.x - bot.x);
+          const distance = Math.hypot(player.x - bot.x, player.y - bot.y);
+          bot.wander += (random() - .5) * dt;
+          const direction = distance < 390 ? toPlayer : bot.wander;
+          if (distance > 110) {
+            bot.x += Math.cos(direction) * 54 * dt;
+            bot.y += Math.sin(direction) * 54 * dt;
+          }
+          bot.fire -= dt;
+          if (distance < 430 && bot.fire <= 0) {
+            shoot(bot.x, bot.y, toPlayer, 330, "bot");
+            bot.fire = 1.2 + random() * 1.2;
+          }
+        }
+
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const bullet = bullets[i];
+          bullet.x += bullet.vx * dt;
+          bullet.y += bullet.vy * dt;
+          bullet.life -= dt;
+          let hit = bullet.life <= 0 ||
+            bullet.x < 0 || bullet.y < 0 ||
+            bullet.x > world.width || bullet.y > world.height;
+
+          if (!hit && bullet.owner === "player") {
+            for (let j = bots.length - 1; j >= 0; j--) {
+              const bot = bots[j];
+              if (Math.hypot(bot.x - bullet.x, bot.y - bullet.y) < bot.radius + 5) {
+                bot.health--;
+                if (bot.health <= 0) {
+                  bots.splice(j, 1);
+                  score++;
+                }
+                hit = true;
+                break;
+              }
+            }
+          } else if (!hit && bullet.owner === "bot" &&
+            Math.hypot(player.x - bullet.x, player.y - bullet.y) < player.radius + 5) {
+            player.health -= 12;
+            hit = true;
+          }
+
+          if (!hit) {
+            for (const obstacle of obstacles) {
+              if (Math.hypot(obstacle.x - bullet.x, obstacle.y - bullet.y) < obstacle.radius) {
+                hit = true;
+                break;
+              }
+            }
+          }
+          if (hit) bullets.splice(i, 1);
+        }
+
+        if (Math.hypot(player.x - zone.x, player.y - zone.y) > zone.radius) {
+          player.health -= 8 * dt;
+        }
+        updateHud();
+        if (player.health <= 0 || bots.length === 0) endGame();
+      }
+
+      function draw() {
+        const width = view.width;
+        const height = view.height;
+        if (!width || !height) return;
+        ctx.clearRect(0, 0, width, height);
+        ctx.save();
+        ctx.translate(view.x, view.y);
+        ctx.scale(view.scale, view.scale);
+
+        ctx.fillStyle = "#819052";
+        ctx.fillRect(0, 0, world.width, world.height);
+        ctx.fillStyle = "#74834a";
+        for (let x = 0; x < world.width; x += 64) {
+          for (let y = 0; y < world.height; y += 64) {
+            if ((x / 64 + y / 64) % 2 === 0) ctx.fillRect(x, y, 32, 32);
+          }
+        }
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, world.width, world.height);
+        ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2, true);
+        ctx.fillStyle = "#52656b66";
+        ctx.fill("evenodd");
+        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = "#bce8ec";
+        ctx.lineWidth = 5;
+        ctx.stroke();
+
+        for (const obstacle of obstacles) {
+          ctx.beginPath();
+          ctx.ellipse(obstacle.x + 3, obstacle.y + 8, obstacle.radius * 1.1, obstacle.radius * .7, 0, 0, Math.PI * 2);
+          ctx.fillStyle = "#26322655";
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(obstacle.x, obstacle.y, obstacle.radius, 0, Math.PI * 2);
+          ctx.fillStyle = obstacle.type === "tree" ? "#315c37" : "#76796b";
+          ctx.fill();
+          ctx.strokeStyle = obstacle.type === "tree" ? "#27482d" : "#55594e";
+          ctx.lineWidth = 4;
+          ctx.stroke();
+          if (obstacle.type === "tree") {
+            ctx.beginPath();
+            ctx.arc(obstacle.x - 5, obstacle.y - 5, obstacle.radius * .48, 0, Math.PI * 2);
+            ctx.fillStyle = "#477a40";
+            ctx.fill();
+          }
+        }
+
+        for (const bot of bots) {
+          drawCharacter(bot.x, bot.y, bot.radius, "#d9654f", Math.atan2(player.y - bot.y, player.x - bot.x));
+          ctx.fillStyle = "#311f1b";
+          ctx.fillRect(bot.x - 13, bot.y - 22, 26, 4);
+          ctx.fillStyle = "#f3ce71";
+          ctx.fillRect(bot.x - 13, bot.y - 22, 26 * bot.health / 3, 4);
+        }
+
+        for (const bullet of bullets) {
+          ctx.beginPath();
+          ctx.arc(bullet.x, bullet.y, bullet.owner === "player" ? 4 : 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = bullet.owner === "player" ? "#fff0a0" : "#ff9277";
+          ctx.fill();
+        }
+
+        drawCharacter(player.x, player.y, player.radius, "#e9c85d", player.angle);
+        ctx.restore();
+      }
+
+      function drawCharacter(x, y, radius, color, angle) {
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = "#24251d";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(angle) * radius * .55, y + Math.sin(angle) * radius * .55);
+        ctx.lineTo(x + Math.cos(angle) * (radius + 12), y + Math.sin(angle) * (radius + 12));
+        ctx.strokeStyle = "#f7e8b2";
+        ctx.lineWidth = 5;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+
+      function endGame() {
+        running = false;
+        fireHeld = false;
+        overlayTitle.textContent = player.health <= 0 ? "Bạn đã bị hạ!" : "Đấu trường đã sạch!";
+        overlayText.textContent = `Bạn hạ được ${score} bot. Nhấn chơi lại để bắt đầu lượt mới.`;
+        startButton.textContent = "Chơi lại";
+        overlay.hidden = false;
+      }
+
+      function frame(time) {
+        const dt = Math.min((time - lastTime) / 1000 || 0, .04);
+        lastTime = time;
+        update(dt);
+        draw();
+        requestAnimationFrame(frame);
+      }
+
+      startButton.addEventListener("click", () => {
+        reset();
+        running = true;
+        overlay.hidden = true;
+      });
+
+      window.addEventListener("keydown", (event) => {
+        const key = event.key.toLowerCase();
+        if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(key)) event.preventDefault();
+        keys.add(key);
+        if (key === "r") {
+          reset();
+          running = true;
+          overlay.hidden = true;
+        }
+      });
+
+      window.addEventListener("keyup", (event) => keys.delete(event.key.toLowerCase()));
+      window.addEventListener("blur", () => {
+        keys.clear();
+        fireHeld = false;
+      });
+
+      canvas.addEventListener("pointermove", (event) => {
+        if (event.pointerType === "mouse" || event.buttons) aimAt(event.clientX, event.clientY);
+      });
+      canvas.addEventListener("pointerdown", (event) => {
+        aimAt(event.clientX, event.clientY);
+        if (event.pointerType === "mouse" && event.button === 0) fireHeld = true;
+      });
+      window.addEventListener("pointerup", () => { fireHeld = false; });
+      window.addEventListener("pointercancel", () => { fireHeld = false; });
+
+      const stick = document.getElementById("stick");
+      stick.addEventListener("pointerdown", (event) => {
+        movePointer = event.pointerId;
+        stick.setPointerCapture(event.pointerId);
+        updateStick(event);
+      });
+      stick.addEventListener("pointermove", (event) => {
+        if (event.pointerId === movePointer) updateStick(event);
+      });
+      function stopStick(event) {
+        if (event.pointerId !== movePointer) return;
+        movePointer = null;
+        movement = { x: 0, y: 0 };
+      }
+      stick.addEventListener("pointerup", stopStick);
+      stick.addEventListener("pointercancel", stopStick);
+      function updateStick(event) {
+        const rect = stick.getBoundingClientRect();
+        const x = (event.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
+        const y = (event.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
+        const length = Math.hypot(x, y) || 1;
+        movement = { x: x / Math.max(1, length), y: y / Math.max(1, length) };
+      }
+
+      const fireButton = document.getElementById("fire");
+      fireButton.addEventListener("pointerdown", (event) => {
+        fireButton.setPointerCapture(event.pointerId);
+        fireHeld = true;
+      });
+      fireButton.addEventListener("pointerup", () => { fireHeld = false; });
+      fireButton.addEventListener("pointercancel", () => { fireHeld = false; });
+
+      window.addEventListener("resize", resize);
+      reset();
+      resize();
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
