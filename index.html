@@ -209,10 +209,10 @@
   <main class="page">
     <header>
       <h1>Survev Sandbox</h1>
-      <span class="badge">DEMO TĨNH · CHƠI OFFLINE</span>
+      <span class="badge">OFFLINE · 1 NGƯỜI CHƠI + BOT</span>
     </header>
     <p class="notice">
-      Đấu trường thử nghiệm chạy hoàn toàn trong trình duyệt. Đây không phải máy chủ hay bản sao đầy đủ của Survev.io.
+      Bản chơi đơn độc lập, không kết nối máy chủ. Có bot, vòng bo, vũ khí và vật phẩm nhặt được; không phải client gốc hay bản sao đầy đủ Survev.io.
     </p>
 
     <section class="game" aria-label="Đấu trường sandbox">
@@ -221,8 +221,12 @@
         <div class="hud-box">
           <div>Máu <span id="healthText">100</span></div>
           <div class="health-track"><div id="healthFill" class="health-fill"></div></div>
+          <div>Giáp <span id="armorText">0</span> · Túi cứu thương <span id="medkitText">1</span></div>
         </div>
-        <div class="hud-box">Mục tiêu: <span id="score">0</span> · Còn lại: <span id="remaining">0</span></div>
+        <div class="hud-box">
+          <div id="weaponText">Súng lục · 12 / 60</div>
+          <div>Mục tiêu: <span id="score">0</span> · Còn lại: <span id="remaining">0</span></div>
+        </div>
       </div>
 
       <div class="touch-controls" aria-label="Điều khiển cảm ứng">
@@ -233,7 +237,7 @@
       <div class="overlay" id="overlay">
         <div class="dialog">
           <h2 id="overlayTitle">Sẵn sàng vào đấu trường?</h2>
-          <p id="overlayText">Di chuyển, ngắm và bắn các bot. Vòng an toàn sẽ thu hẹp dần — đừng đứng ngoài vùng sáng.</p>
+          <p id="overlayText">Tiến gần để tự nhặt vũ khí và vật phẩm, hạ bot, sống sót trong vòng an toàn. WASD để di chuyển, chuột để ngắm và bắn.</p>
           <button class="primary" id="startButton" type="button">Bắt đầu</button>
         </div>
       </div>
@@ -243,7 +247,8 @@
       <span><strong>WASD / phím mũi tên</strong>: di chuyển</span>
       <span><strong>Chuột</strong>: ngắm</span>
       <span><strong>Giữ chuột trái</strong>: bắn</span>
-      <span><strong>R</strong>: chơi lại</span>
+      <span><strong>1–4</strong>: đổi súng · <strong>R</strong>: nạp đạn · <strong>H</strong>: hồi máu</span>
+      <span><strong>Esc</strong>: tạm dừng</span>
       <span><strong>Điện thoại</strong>: chạm để ngắm, dùng nút di chuyển và bắn</span>
     </div>
   </main>
@@ -260,15 +265,35 @@
       const startButton = document.getElementById("startButton");
       const healthText = document.getElementById("healthText");
       const healthFill = document.getElementById("healthFill");
+      const armorText = document.getElementById("armorText");
+      const medkitText = document.getElementById("medkitText");
+      const weaponText = document.getElementById("weaponText");
       const scoreText = document.getElementById("score");
       const remainingText = document.getElementById("remaining");
       const keys = new Set();
       const world = { width: 1600, height: 1100 };
-      const player = { x: 800, y: 550, radius: 15, health: 100, angle: 0, cooldown: 0 };
+      const weapons = [
+        { name: "Súng lục", magazine: 12, damage: 1, interval: .32, speed: 700, pellets: 1, reload: 1.1 },
+        { name: "SMG", magazine: 30, damage: 1, interval: .095, speed: 660, pellets: 1, reload: 1.5 },
+        { name: "Shotgun", magazine: 5, damage: 1, interval: .72, speed: 590, pellets: 6, reload: 1.8 },
+        { name: "Rifle", magazine: 20, damage: 1, interval: .16, speed: 820, pellets: 1, reload: 1.7 }
+      ];
+      const player = {
+        x: 800, y: 550, radius: 15, health: 100, armor: 0, medkits: 1,
+        angle: 0, cooldown: 0, weapon: 0, reloading: 0,
+        ammo: [
+          { magazine: 12, reserve: 60 },
+          { magazine: 0, reserve: 0 },
+          { magazine: 0, reserve: 0 },
+          { magazine: 0, reserve: 0 }
+        ],
+        owned: [true, false, false, false]
+      };
       const zone = { x: 800, y: 550, radius: 520, minRadius: 115, elapsed: 0 };
       const bots = [];
       const bullets = [];
       const obstacles = [];
+      const loot = [];
       let running = false;
       let score = 0;
       let lastTime = 0;
@@ -303,12 +328,24 @@
         player.x = world.width / 2;
         player.y = world.height / 2;
         player.health = 100;
+        player.armor = 0;
+        player.medkits = 1;
         player.cooldown = 0;
+        player.weapon = 0;
+        player.reloading = 0;
+        player.ammo = [
+          { magazine: 12, reserve: 60 },
+          { magazine: 0, reserve: 0 },
+          { magazine: 0, reserve: 0 },
+          { magazine: 0, reserve: 0 }
+        ];
+        player.owned = [true, false, false, false];
         zone.elapsed = 0;
         zone.radius = 520;
         bullets.length = 0;
         bots.length = 0;
         obstacles.length = 0;
+        loot.length = 0;
         for (let i = 0; i < 28; i++) {
           obstacles.push({
             x: 85 + random() * (world.width - 170),
@@ -329,12 +366,31 @@
             wander: random() * Math.PI * 2
           });
         }
+        for (let i = 1; i < weapons.length; i++) {
+          const angle = random() * Math.PI * 2;
+          loot.push({
+            x: player.x + Math.cos(angle) * (120 + random() * 120),
+            y: player.y + Math.sin(angle) * (120 + random() * 120),
+            type: "weapon",
+            weapon: i
+          });
+        }
+        loot.push(
+          { x: 700, y: 460, type: "medkit", weapon: 0 },
+          { x: 900, y: 650, type: "armor", weapon: 0 },
+          { x: 790, y: 720, type: "ammo", weapon: 0 }
+        );
         updateHud();
       }
 
       function updateHud() {
         healthText.textContent = Math.max(0, Math.ceil(player.health));
         healthFill.style.width = `${Math.max(0, player.health)}%`;
+        armorText.textContent = player.armor;
+        medkitText.textContent = player.medkits;
+        const weapon = weapons[player.weapon];
+        const ammo = player.ammo[player.weapon];
+        weaponText.textContent = `${weapon.name} · ${player.reloading > 0 ? "Đang nạp…" : `${ammo.magazine} / ${ammo.reserve}`}`;
         scoreText.textContent = score;
         remainingText.textContent = bots.length;
       }
@@ -352,15 +408,36 @@
         player.angle = Math.atan2(point.y - player.y, point.x - player.x);
       }
 
-      function shoot(x, y, angle, speed, owner) {
+      function shoot(x, y, angle, speed, owner, damage = 1) {
         bullets.push({
           x: x + Math.cos(angle) * 22,
           y: y + Math.sin(angle) * 22,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           life: 1.4,
-          owner
+          owner,
+          damage
         });
+      }
+
+      function reload() {
+        const weapon = weapons[player.weapon];
+        const ammo = player.ammo[player.weapon];
+        if (!running || player.reloading > 0 || ammo.magazine >= weapon.magazine || ammo.reserve <= 0) return;
+        player.reloading = weapon.reload;
+      }
+
+      function useMedkit() {
+        if (!running || player.medkits <= 0 || player.health >= 100) return;
+        player.medkits--;
+        player.health = Math.min(100, player.health + 45);
+        updateHud();
+      }
+
+      function collidesWithObstacle(x, y, radius) {
+        return obstacles.some((obstacle) =>
+          Math.hypot(x - obstacle.x, y - obstacle.y) < radius + obstacle.radius
+        );
       }
 
       function update(dt) {
@@ -368,6 +445,17 @@
         zone.elapsed += dt;
         zone.radius = Math.max(zone.minRadius, 520 - zone.elapsed * 3);
         player.cooldown -= dt;
+        if (player.reloading > 0) {
+          player.reloading -= dt;
+          if (player.reloading <= 0) {
+            const weapon = weapons[player.weapon];
+            const ammo = player.ammo[player.weapon];
+            const loaded = Math.min(weapon.magazine - ammo.magazine, ammo.reserve);
+            ammo.magazine += loaded;
+            ammo.reserve -= loaded;
+            player.reloading = 0;
+          }
+        }
 
         let dx = movement.x;
         let dy = movement.y;
@@ -376,14 +464,26 @@
         if (keys.has("a") || keys.has("arrowleft")) dx -= 1;
         if (keys.has("d") || keys.has("arrowright")) dx += 1;
         const length = Math.hypot(dx, dy) || 1;
-        player.x += dx / length * 220 * dt;
-        player.y += dy / length * 220 * dt;
+        const nextX = player.x + dx / length * 220 * dt;
+        const nextY = player.y + dy / length * 220 * dt;
+        if (!collidesWithObstacle(nextX, player.y, player.radius)) player.x = nextX;
+        if (!collidesWithObstacle(player.x, nextY, player.radius)) player.y = nextY;
         player.x = Math.max(player.radius, Math.min(world.width - player.radius, player.x));
         player.y = Math.max(player.radius, Math.min(world.height - player.radius, player.y));
 
-        if (fireHeld && player.cooldown <= 0) {
-          shoot(player.x, player.y, player.angle, 690, "player");
-          player.cooldown = .19;
+        if (fireHeld && player.cooldown <= 0 && player.reloading <= 0) {
+          const weapon = weapons[player.weapon];
+          const ammo = player.ammo[player.weapon];
+          if (ammo.magazine > 0) {
+            ammo.magazine--;
+            for (let pellet = 0; pellet < weapon.pellets; pellet++) {
+              const spread = weapon.pellets === 1 ? (random() - .5) * .045 : (random() - .5) * .32;
+              shoot(player.x, player.y, player.angle + spread, weapon.speed, "player", weapon.damage);
+            }
+            player.cooldown = weapon.interval;
+          } else {
+            reload();
+          }
         }
 
         for (const bot of bots) {
@@ -392,12 +492,14 @@
           bot.wander += (random() - .5) * dt;
           const direction = distance < 390 ? toPlayer : bot.wander;
           if (distance > 110) {
-            bot.x += Math.cos(direction) * 54 * dt;
-            bot.y += Math.sin(direction) * 54 * dt;
+            const nextX = bot.x + Math.cos(direction) * 54 * dt;
+            const nextY = bot.y + Math.sin(direction) * 54 * dt;
+            if (!collidesWithObstacle(nextX, bot.y, bot.radius)) bot.x = nextX;
+            if (!collidesWithObstacle(bot.x, nextY, bot.radius)) bot.y = nextY;
           }
           bot.fire -= dt;
           if (distance < 430 && bot.fire <= 0) {
-            shoot(bot.x, bot.y, toPlayer, 330, "bot");
+            shoot(bot.x, bot.y, toPlayer + (random() - .5) * .2, 330, "bot");
             bot.fire = 1.2 + random() * 1.2;
           }
         }
@@ -415,8 +517,14 @@
             for (let j = bots.length - 1; j >= 0; j--) {
               const bot = bots[j];
               if (Math.hypot(bot.x - bullet.x, bot.y - bullet.y) < bot.radius + 5) {
-                bot.health--;
+                bot.health -= bullet.damage;
                 if (bot.health <= 0) {
+                  if (random() < .72) {
+                    const types = ["ammo", "medkit", "armor", "weapon"];
+                    let type = types[Math.floor(random() * types.length)];
+                    let weapon = Math.floor(random() * (weapons.length - 1)) + 1;
+                    loot.push({ x: bot.x, y: bot.y, type, weapon });
+                  }
                   bots.splice(j, 1);
                   score++;
                 }
@@ -426,7 +534,10 @@
             }
           } else if (!hit && bullet.owner === "bot" &&
             Math.hypot(player.x - bullet.x, player.y - bullet.y) < player.radius + 5) {
-            player.health -= 12;
+            const damage = 12;
+            const absorbed = Math.min(player.armor, damage * .65);
+            player.armor -= absorbed;
+            player.health -= damage - absorbed;
             hit = true;
           }
 
@@ -439,6 +550,24 @@
             }
           }
           if (hit) bullets.splice(i, 1);
+        }
+
+        for (let i = loot.length - 1; i >= 0; i--) {
+          if (Math.hypot(player.x - loot[i].x, player.y - loot[i].y) >= player.radius + 16) continue;
+          const item = loot.splice(i, 1)[0];
+          if (item.type === "medkit") player.medkits++;
+          if (item.type === "armor") player.armor = Math.min(100, player.armor + 35);
+          if (item.type === "ammo") {
+            for (let j = 0; j < player.ammo.length; j++) {
+              if (player.owned[j]) player.ammo[j].reserve += j === 2 ? 8 : 24;
+            }
+          }
+          if (item.type === "weapon") {
+            player.owned[item.weapon] = true;
+            player.ammo[item.weapon].reserve += weapons[item.weapon].magazine * 2;
+            player.weapon = item.weapon;
+            player.reloading = 0;
+          }
         }
 
         if (Math.hypot(player.x - zone.x, player.y - zone.y) > zone.radius) {
@@ -499,6 +628,23 @@
           }
         }
 
+        for (const item of loot) {
+          ctx.beginPath();
+          ctx.arc(item.x, item.y, 10, 0, Math.PI * 2);
+          ctx.fillStyle = item.type === "weapon" ? "#e8d766" :
+            item.type === "medkit" ? "#d95d54" :
+            item.type === "armor" ? "#5aa5d2" : "#e5e1c4";
+          ctx.fill();
+          ctx.strokeStyle = "#25251e";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = "#172018";
+          ctx.font = "bold 11px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(item.type === "weapon" ? "W" : item.type === "medkit" ? "+" : item.type === "armor" ? "A" : "•", item.x, item.y);
+        }
+
         for (const bot of bots) {
           drawCharacter(bot.x, bot.y, bot.radius, "#d9654f", Math.atan2(player.y - bot.y, player.x - bot.x));
           ctx.fillStyle = "#311f1b";
@@ -533,6 +679,13 @@
         ctx.lineWidth = 5;
         ctx.lineCap = "round";
         ctx.stroke();
+        if (x === player.x && y === player.y) {
+          ctx.fillStyle = "#e7d99e";
+          ctx.font = "10px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillText(weapons[player.weapon].name, x, y + radius + 7);
+        }
       }
 
       function endGame() {
@@ -560,12 +713,14 @@
 
       window.addEventListener("keydown", (event) => {
         const key = event.key.toLowerCase();
-        if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(key)) event.preventDefault();
+        if (["arrowup", "arrowdown", "arrowleft", "arrowright", " ", "r"].includes(key)) event.preventDefault();
         keys.add(key);
-        if (key === "r") {
-          reset();
-          running = true;
-          overlay.hidden = true;
+        if (key === "r") reload();
+        if (key === "h") useMedkit();
+        if (/^[1-4]$/.test(key) && player.owned[Number(key) - 1]) {
+          player.weapon = Number(key) - 1;
+          player.reloading = 0;
+          updateHud();
         }
       });
 
